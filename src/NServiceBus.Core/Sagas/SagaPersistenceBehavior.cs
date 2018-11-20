@@ -158,6 +158,30 @@
                     await sagaPersister.Update(saga.Entity, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
                 }
 
+                foreach (var timeoutRequest in saga.RequestedTimeouts)
+                {
+                    var options = new SendOptions();
+
+                    if (timeoutRequest.At.HasValue)
+                    {
+                        options.DoNotDeliverBefore(timeoutRequest.At.Value);
+                    }
+
+                    if (timeoutRequest.Within.HasValue)
+                    {
+                        options.DelayDeliveryWith(timeoutRequest.Within.Value);
+                    }
+
+                    options.RouteToThisEndpoint();
+
+                    options.SetHeader(Headers.SagaId, saga.Entity.Id.ToString());
+                    options.SetHeader("NServiceBus.Saga.TimeoutId", timeoutRequest.Id);
+                    options.SetHeader(Headers.IsSagaTimeoutMessage, bool.TrueString);
+                    options.SetHeader(Headers.SagaType, saga.GetType().AssemblyQualifiedName);
+
+                    await context.Send(timeoutRequest.Message, options).ConfigureAwait(false);
+                }
+
                 sagaInstanceState.Updated();
             }
         }

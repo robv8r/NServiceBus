@@ -1,8 +1,9 @@
 namespace NServiceBus
 {
     using System;
+    using System.Collections.Generic;
     using System.Threading.Tasks;
-    using Extensibility;
+    using Sagas;
 
     /// <summary>
     /// This class is used to define sagas containing data and handling a message.
@@ -54,14 +55,15 @@ namespace NServiceBus
 
             VerifySagaCanHandleTimeout(timeoutMessage);
 
-            var options = new SendOptions();
+            
+            RequestedTimeouts.Add(new Timeout
+            {
+                Id = CombGuid.Generate().ToString(),
+                Message = timeoutMessage,
+                At = at
+            });
 
-            options.DoNotDeliverBefore(at);
-            options.RouteToThisEndpoint();
-
-            SetTimeoutHeaders(options);
-
-            return context.Send(timeoutMessage, options);
+            return TaskEx.CompletedTask;
         }
 
         /// <summary>
@@ -84,14 +86,14 @@ namespace NServiceBus
         {
             VerifySagaCanHandleTimeout(timeoutMessage);
 
-            var sendOptions = new SendOptions();
+            RequestedTimeouts.Add(new Timeout
+            {
+                Id = CombGuid.Generate().ToString(), 
+                Message = timeoutMessage,
+                Within = within
+            });
 
-            sendOptions.DelayDeliveryWith(within);
-            sendOptions.RouteToThisEndpoint();
-
-            SetTimeoutHeaders(sendOptions);
-
-            return context.Send(timeoutMessage, sendOptions);
+            return TaskEx.CompletedTask;
         }
 
         /// <summary>
@@ -140,11 +142,14 @@ namespace NServiceBus
             }
         }
 
-        void SetTimeoutHeaders(ExtendableOptions options)
+        internal List<Timeout> RequestedTimeouts = new List<Timeout>();
+
+        internal class Timeout
         {
-            options.SetHeader(Headers.SagaId, Entity.Id.ToString());
-            options.SetHeader(Headers.IsSagaTimeoutMessage, bool.TrueString);
-            options.SetHeader(Headers.SagaType, GetType().AssemblyQualifiedName);
+            public string Id { get; set; }
+            public object Message { get; set; }
+            public TimeSpan? Within { get; set; }
+            public DateTime? At { get; set; }
         }
     }
 }
