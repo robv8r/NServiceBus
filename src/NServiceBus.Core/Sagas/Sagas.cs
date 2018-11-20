@@ -57,8 +57,13 @@
                 }
             }
 
+            if (!context.Container.HasComponent<ISagaPersister2>())
+            {
+                context.Container.ConfigureComponent<ISagaPersister2>(b=>new SagaPersister2Adapter(b.Build<ISagaPersister>()),DependencyLifecycle.SingleInstance);
+            }
+
             // Register the Saga related behaviors for incoming messages
-            context.Pipeline.Register("InvokeSaga", b => new SagaPersistenceBehavior(b.Build<ISagaPersister>(), sagaIdGenerator, b.Build<ICancelDeferredMessages>(), sagaMetaModel), "Invokes the saga logic");
+            context.Pipeline.Register("InvokeSaga", b => new SagaPersistenceBehavior(b.Build<ISagaPersister2>(), sagaIdGenerator, b.Build<ICancelDeferredMessages>(), sagaMetaModel), "Invokes the saga logic");
             context.Pipeline.Register("InvokeSagaNotFound", new InvokeSagaNotFoundBehavior(), "Invokes saga not found logic");
             context.Pipeline.Register("AttachSagaDetailsToOutGoingMessage", new AttachSagaDetailsToOutGoingMessageBehavior(), "Makes sure that outgoing messages have saga info attached to them");
         }

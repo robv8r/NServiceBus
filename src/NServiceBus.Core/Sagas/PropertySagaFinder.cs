@@ -10,12 +10,12 @@ namespace NServiceBus
 
     class PropertySagaFinder<TSagaData> : SagaFinder where TSagaData : class, IContainSagaData
     {
-        public PropertySagaFinder(ISagaPersister sagaPersister)
+        public PropertySagaFinder(ISagaPersister2 sagaPersister)
         {
             this.sagaPersister = sagaPersister;
         }
 
-        public override async Task<IContainSagaData> Find(IBuilder builder, SagaFinderDefinition finderDefinition, SynchronizedStorageSession storageSession, ContextBag context, object message)
+        public override async Task<SagaInstance> Find(IBuilder builder, SagaFinderDefinition finderDefinition, SynchronizedStorageSession storageSession, ContextBag context, object message)
         {
             var propertyAccessor = (Func<object, object>) finderDefinition.Properties["property-accessor"];
             var propertyValue = propertyAccessor(message);
@@ -27,13 +27,13 @@ namespace NServiceBus
 
             if (sagaPropertyName.ToLower() == "id")
             {
-                return await sagaPersister.Get<TSagaData>((Guid) propertyValue, storageSession, context).ConfigureAwait(false);
+                return await sagaPersister.Get<TSagaData>(((Guid) propertyValue).ToString(), storageSession, context).ConfigureAwait(false);
             }
 
             return await sagaPersister.Get<TSagaData>(sagaPropertyName, propertyValue, storageSession, context).ConfigureAwait(false);
         }
 
-        ISagaPersister sagaPersister;
+        ISagaPersister2 sagaPersister;
     }
 
 

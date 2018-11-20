@@ -1,6 +1,5 @@
 namespace NServiceBus
 {
-    using System;
     using System.Threading.Tasks;
     using Extensibility;
     using Persistence;
@@ -10,9 +9,9 @@ namespace NServiceBus
     class LoadSagaByIdWrapper<T> : SagaLoader 
         where T : class, IContainSagaData
     {
-        public async Task<IContainSagaData> Load(ISagaPersister persister, string sagaId, SynchronizedStorageSession storageSession, ContextBag context)
+        public async Task<SagaInstance> Load(ISagaPersister2 persister, string sagaId, SynchronizedStorageSession storageSession, ContextBag context)
         {
-            return await persister.Get<T>(Guid.Parse(sagaId), storageSession, context).ConfigureAwait(false);
+            return await persister.Get<T>(sagaId, storageSession, context).ConfigureAwait(false);
         }
     }
 }

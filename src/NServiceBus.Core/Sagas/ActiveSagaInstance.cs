@@ -76,27 +76,36 @@ namespace NServiceBus.Sagas
         {
             Guard.AgainstNull(nameof(sagaEntity), sagaEntity);
             IsNew = true;
-            AttachEntity(sagaEntity);
+            AttachInstance(new SagaInstance
+            {
+                Entity = sagaEntity
+            });
         }
 
-        internal void AttachExistingEntity(IContainSagaData loadedEntity)
+        internal void AttachNewEntity(SagaInstance loadedInstance)
         {
-            AttachEntity(loadedEntity);
+            IsNew = true;
+            AttachInstance(loadedInstance);
         }
 
-        void AttachEntity(IContainSagaData sagaEntity)
+        internal void AttachExistingInstance(SagaInstance loadedInstance)
         {
-            sagaId = sagaEntity.Id;
+            AttachInstance(loadedInstance);
+        }
+
+        void AttachInstance(SagaInstance instance)
+        {
+            sagaId = instance.Entity.Id;
             UpdateModified();
-            Instance.Entity = sagaEntity;
-            SagaId = sagaEntity.Id.ToString();
+            Instance.Entity = instance.Entity;
+            SagaId = instance.Entity.Id.ToString();
 
-            var properties = sagaEntity.GetType().GetProperties();
+            var properties = instance.Entity.GetType().GetProperties();
 
             if (Metadata.TryGetCorrelationProperty(out var correlatedPropertyMetadata))
             {
                 var propertyInfo = properties.Single(p => p.Name == correlatedPropertyMetadata.Name);
-                var propertyValue = propertyInfo.GetValue(sagaEntity);
+                var propertyValue = propertyInfo.GetValue(instance.Entity);
                 var defaultValue = GetDefault(propertyInfo.PropertyType);
                 var hasValue = propertyValue != null && !propertyValue.Equals(defaultValue);
 

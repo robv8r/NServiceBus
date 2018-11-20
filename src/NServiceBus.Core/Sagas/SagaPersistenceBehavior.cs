@@ -12,7 +12,7 @@
 
     class SagaPersistenceBehavior : IBehavior<IInvokeHandlerContext, IInvokeHandlerContext>
     {
-        public SagaPersistenceBehavior(ISagaPersister persister, ISagaIdGenerator sagaIdGenerator, ICancelDeferredMessages timeoutCancellation, SagaMetadataCollection sagaMetadataCollection)
+        public SagaPersistenceBehavior(ISagaPersister2 persister, ISagaIdGenerator sagaIdGenerator, ICancelDeferredMessages timeoutCancellation, SagaMetadataCollection sagaMetadataCollection)
         {
             this.sagaIdGenerator = sagaIdGenerator;
             sagaPersister = persister;
@@ -75,9 +75,9 @@
             //so that other behaviors can access the saga
             context.Extensions.Set(sagaInstanceState);
 
-            var loadedEntity = await TryLoadSagaEntity(currentSagaMetadata, context).ConfigureAwait(false);
+            var loadedInstance = await TryLoadSagaEntity(currentSagaMetadata, context).ConfigureAwait(false);
 
-            if (loadedEntity == null)
+            if (!loadedInstance.Found)
             {
                 if (IsMessageAllowedToStartTheSaga(context, currentSagaMetadata))
                 {
@@ -112,7 +112,7 @@
             else
             {
                 context.Extensions.Get<SagaInvocationResult>().SagaFound();
-                sagaInstanceState.AttachExistingEntity(loadedEntity);
+                sagaInstanceState.AttachExistingInstance(loadedInstance);
             }
 
             await next(context).ConfigureAwait(false);
@@ -122,11 +122,16 @@
                 return;
             }
 
+            var sagaInstanceToPersist = new SagaInstance
+            {
+                Entity = saga.Entity
+            };
+
             if (saga.Completed)
             {
                 if (!sagaInstanceState.IsNew)
                 {
-                    await sagaPersister.Complete(saga.Entity, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
+                    await sagaPersister.Complete(sagaInstanceToPersist, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
                 }
 
                 if (saga.Entity.Id != Guid.Empty)
@@ -151,11 +156,11 @@
                         sagaCorrelationProperty = new SagaCorrelationProperty(correlationProperty.PropertyInfo.Name, correlationProperty.PropertyInfo.GetValue(sagaInstanceState.Instance.Entity));
                     }
 
-                    await sagaPersister.Save(saga.Entity, sagaCorrelationProperty, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
+                    await sagaPersister.Save(sagaInstanceToPersist, sagaCorrelationProperty, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
                 }
                 else
                 {
-                    await sagaPersister.Update(saga.Entity, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
+                    await sagaPersister.Update(sagaInstanceToPersist, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
                 }
 
                 foreach (var timeoutRequest in saga.RequestedTimeouts)
@@ -261,7 +266,7 @@
             return true;
         }
 
-        Task<IContainSagaData> TryLoadSagaEntity(SagaMetadata metadata, IInvokeHandlerContext context)
+        Task<SagaInstance> TryLoadSagaEntity(SagaMetadata metadata, IInvokeHandlerContext context)
         {
             if (context.Headers.TryGetValue(Headers.SagaId, out var sagaId) && !string.IsNullOrEmpty(sagaId))
             {
@@ -342,11 +347,11 @@
         }
 
         readonly SagaMetadataCollection sagaMetadataCollection;
-        readonly ISagaPersister sagaPersister;
+        readonly ISagaPersister2 sagaPersister;
         readonly ICancelDeferredMessages timeoutCancellation;
         readonly ISagaIdGenerator sagaIdGenerator;
 
-        static readonly Task<IContainSagaData> DefaultSagaDataCompletedTask = Task.FromResult(default(IContainSagaData));
+        static readonly Task<SagaInstance> DefaultSagaDataCompletedTask = Task.FromResult(default(SagaInstance));
         static readonly ILog logger = LogManager.GetLogger<SagaPersistenceBehavior>();
     }
 }

@@ -55,7 +55,7 @@ namespace NServiceBus
             VerifySagaCanHandleTimeout(timeoutMessage);
 
             
-            RequestedTimeouts.Add(new Timeout
+            RequestedTimeouts.Add(new RequestedTimeout
             {
                 Id = CombGuid.Generate().ToString(),
                 Message = timeoutMessage,
@@ -85,7 +85,7 @@ namespace NServiceBus
         {
             VerifySagaCanHandleTimeout(timeoutMessage);
 
-            RequestedTimeouts.Add(new Timeout
+            RequestedTimeouts.Add(new RequestedTimeout
             {
                 Id = CombGuid.Generate().ToString(), 
                 Message = timeoutMessage,
@@ -141,14 +141,14 @@ namespace NServiceBus
             }
         }
 
-        internal List<Timeout> RequestedTimeouts = new List<Timeout>();
+        internal List<RequestedTimeout> RequestedTimeouts = new List<RequestedTimeout>();
+    }
 
-        internal class Timeout
-        {
-            public string Id { get; set; }
-            public object Message { get; set; }
-            public TimeSpan? Within { get; set; }
-            public DateTime? At { get; set; }
-        }
+    class RequestedTimeout
+    {
+        public string Id { get; set; }
+        public object Message { get; set; }
+        public TimeSpan? Within { get; set; }
+        public DateTime? At { get; set; }
     }
 }
