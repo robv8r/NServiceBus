@@ -3,7 +3,6 @@ namespace NServiceBus
     using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
-    using Sagas;
 
     /// <summary>
     /// This class is used to define sagas containing data and handling a message.
