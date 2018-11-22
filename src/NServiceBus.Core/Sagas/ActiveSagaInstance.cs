@@ -33,7 +33,7 @@ namespace NServiceBus.Sagas
         /// Metadata for this active saga.
         /// </summary>
         internal SagaMetadata Metadata { get; }
-
+        
         /// <summary>
         /// The actual saga instance.
         /// </summary>
@@ -76,24 +76,18 @@ namespace NServiceBus.Sagas
         {
             Guard.AgainstNull(nameof(sagaEntity), sagaEntity);
             IsNew = true;
-            AttachInstance(new SagaInstance
+            AttachPersistentSagaInstance(new PersistentSagaInstance
             {
                 Entity = sagaEntity
             });
         }
 
-        internal void AttachNewEntity(SagaInstance loadedInstance)
+        internal void AttachExistingPersistentInstance(PersistentSagaInstance loadedInstance)
         {
-            IsNew = true;
-            AttachInstance(loadedInstance);
+            AttachPersistentSagaInstance(loadedInstance);
         }
 
-        internal void AttachExistingInstance(SagaInstance loadedInstance)
-        {
-            AttachInstance(loadedInstance);
-        }
-
-        void AttachInstance(SagaInstance instance)
+        void AttachPersistentSagaInstance(PersistentSagaInstance instance)
         {
             sagaId = instance.Entity.Id;
             UpdateModified();
@@ -115,6 +109,15 @@ namespace NServiceBus.Sagas
                     InitialValue = propertyValue,
                     HasInitialValue = hasValue
                 };
+            }
+
+            foreach (var timeout in instance.Timeouts)
+            {
+                Instance.ExistingTimeouts.Add(new ExistingTimeout
+                {
+                    Type = timeout.Type,
+                    Canceled = timeout.Canceled
+                });
             }
         }
 

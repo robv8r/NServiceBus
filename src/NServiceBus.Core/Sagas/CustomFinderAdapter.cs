@@ -9,7 +9,7 @@ namespace NServiceBus
 
     class CustomFinderAdapter<TSagaData, TMessage> : SagaFinder where TSagaData : IContainSagaData
     {
-        public override async Task<SagaInstance> Find(IBuilder builder, SagaFinderDefinition finderDefinition, SynchronizedStorageSession storageSession, ContextBag context, object message)
+        public override async Task<PersistentSagaInstance> Find(IBuilder builder, SagaFinderDefinition finderDefinition, SynchronizedStorageSession storageSession, ContextBag context, object message)
         {
             var customFinderType = (Type)finderDefinition.Properties["custom-finder-clr-type"];
 
@@ -20,7 +20,7 @@ namespace NServiceBus
                 .ThrowIfNull()
                 .ConfigureAwait(false);
 
-            return new SagaInstance
+            return new PersistentSagaInstance
             {
                 Entity = entity
             };

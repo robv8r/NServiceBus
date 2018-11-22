@@ -7,6 +7,6 @@ namespace NServiceBus
 
     interface SagaLoader
     {
-        Task<SagaInstance> Load(ISagaPersister2 persister, string sagaId, SynchronizedStorageSession storageSession, ContextBag context);
+        Task<PersistentSagaInstance> Load(ISagaPersister2 persister, string sagaId, SynchronizedStorageSession storageSession, ContextBag context);
     }
 }

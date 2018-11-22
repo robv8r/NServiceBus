@@ -12,12 +12,13 @@
 
     class SagaPersistenceBehavior : IBehavior<IInvokeHandlerContext, IInvokeHandlerContext>
     {
-        public SagaPersistenceBehavior(ISagaPersister2 persister, ISagaIdGenerator sagaIdGenerator, ICancelDeferredMessages timeoutCancellation, SagaMetadataCollection sagaMetadataCollection)
+        public SagaPersistenceBehavior(ISagaPersister2 persister, ISagaIdGenerator sagaIdGenerator, ICancelDeferredMessages timeoutCancellation, SagaMetadataCollection sagaMetadataCollection, bool persisterSupportsTimeoutStorage)
         {
             this.sagaIdGenerator = sagaIdGenerator;
             sagaPersister = persister;
             this.timeoutCancellation = timeoutCancellation;
             this.sagaMetadataCollection = sagaMetadataCollection;
+            this.persisterSupportsTimeoutStorage = persisterSupportsTimeoutStorage;
         }
 
         public async Task Invoke(IInvokeHandlerContext context, Func<IInvokeHandlerContext, Task> next)
@@ -75,13 +76,17 @@
             //so that other behaviors can access the saga
             context.Extensions.Set(sagaInstanceState);
 
-            var loadedInstance = await TryLoadSagaEntity(currentSagaMetadata, context).ConfigureAwait(false);
+            var persistentInstance = await TryLoadSagaEntity(currentSagaMetadata, context).ConfigureAwait(false);
 
-            if (!loadedInstance.Found)
+            if (!persistentInstance.Found)
             {
                 if (IsMessageAllowedToStartTheSaga(context, currentSagaMetadata))
                 {
                     context.Extensions.Get<SagaInvocationResult>().SagaFound();
+                    var entity = CreateNewSagaEntity(currentSagaMetadata, context);
+
+                    persistentInstance.Entity = entity;
+
                     sagaInstanceState.AttachNewEntity(CreateNewSagaEntity(currentSagaMetadata, context));
                 }
                 else
@@ -112,26 +117,37 @@
             else
             {
                 context.Extensions.Get<SagaInvocationResult>().SagaFound();
-                sagaInstanceState.AttachExistingInstance(loadedInstance);
+                sagaInstanceState.AttachExistingPersistentInstance(persistentInstance);
             }
 
-            await next(context).ConfigureAwait(false);
+
+            var skipHandlerInvocation = false;
+
+            if (persisterSupportsTimeoutStorage && context.Headers.TryGetValue(TimeoutIdHeaderKey, out var timeoutId))
+            {
+                var timeout = persistentInstance.Timeouts.SingleOrDefault(t => t.Id == timeoutId);
+
+                if (timeout == null || timeout.Canceled)
+                {
+                    skipHandlerInvocation = true;
+                }
+            }
+
+            if (!skipHandlerInvocation)
+            {
+                await next(context).ConfigureAwait(false);
+            }
 
             if (sagaInstanceState.NotFound)
             {
                 return;
             }
 
-            var sagaInstanceToPersist = new SagaInstance
-            {
-                Entity = saga.Entity
-            };
-
             if (saga.Completed)
             {
                 if (!sagaInstanceState.IsNew)
                 {
-                    await sagaPersister.Complete(sagaInstanceToPersist, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
+                    await sagaPersister.Complete(persistentInstance, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
                 }
 
                 if (saga.Entity.Id != Guid.Empty)
@@ -146,22 +162,6 @@
             else
             {
                 sagaInstanceState.ValidateChanges();
-
-                if (sagaInstanceState.IsNew)
-                {
-                    var sagaCorrelationProperty = SagaCorrelationProperty.None;
-
-                    if (sagaInstanceState.TryGetCorrelationProperty(out var correlationProperty))
-                    {
-                        sagaCorrelationProperty = new SagaCorrelationProperty(correlationProperty.PropertyInfo.Name, correlationProperty.PropertyInfo.GetValue(sagaInstanceState.Instance.Entity));
-                    }
-
-                    await sagaPersister.Save(sagaInstanceToPersist, sagaCorrelationProperty, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
-                }
-                else
-                {
-                    await sagaPersister.Update(sagaInstanceToPersist, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
-                }
 
                 foreach (var timeoutRequest in saga.RequestedTimeouts)
                 {
@@ -180,11 +180,33 @@
                     options.RouteToThisEndpoint();
 
                     options.SetHeader(Headers.SagaId, saga.Entity.Id.ToString());
-                    options.SetHeader("NServiceBus.Saga.TimeoutId", timeoutRequest.Id);
+                    options.SetHeader(TimeoutIdHeaderKey, timeoutRequest.Id);
                     options.SetHeader(Headers.IsSagaTimeoutMessage, bool.TrueString);
                     options.SetHeader(Headers.SagaType, saga.GetType().AssemblyQualifiedName);
 
                     await context.Send(timeoutRequest.Message, options).ConfigureAwait(false);
+
+                    persistentInstance.Timeouts.Add(new PersistentSagaInstance.Timeout
+                    {
+                        Id = timeoutRequest.Id,
+                        Type = timeoutRequest.Type
+                    });
+                }
+
+                if (sagaInstanceState.IsNew)
+                {
+                    var sagaCorrelationProperty = SagaCorrelationProperty.None;
+
+                    if (sagaInstanceState.TryGetCorrelationProperty(out var correlationProperty))
+                    {
+                        sagaCorrelationProperty = new SagaCorrelationProperty(correlationProperty.PropertyInfo.Name, correlationProperty.PropertyInfo.GetValue(sagaInstanceState.Instance.Entity));
+                    }
+
+                    await sagaPersister.Save(persistentInstance, sagaCorrelationProperty, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
+                }
+                else
+                {
+                    await sagaPersister.Update(persistentInstance, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
                 }
 
                 sagaInstanceState.Updated();
@@ -266,7 +288,7 @@
             return true;
         }
 
-        Task<SagaInstance> TryLoadSagaEntity(SagaMetadata metadata, IInvokeHandlerContext context)
+        Task<PersistentSagaInstance> TryLoadSagaEntity(SagaMetadata metadata, IInvokeHandlerContext context)
         {
             if (context.Headers.TryGetValue(Headers.SagaId, out var sagaId) && !string.IsNullOrEmpty(sagaId))
             {
@@ -347,11 +369,13 @@
         }
 
         readonly SagaMetadataCollection sagaMetadataCollection;
+        readonly bool persisterSupportsTimeoutStorage;
         readonly ISagaPersister2 sagaPersister;
         readonly ICancelDeferredMessages timeoutCancellation;
         readonly ISagaIdGenerator sagaIdGenerator;
 
-        static readonly Task<SagaInstance> DefaultSagaDataCompletedTask = Task.FromResult(default(SagaInstance));
+        static readonly Task<PersistentSagaInstance> DefaultSagaDataCompletedTask = Task.FromResult(default(PersistentSagaInstance));
+        static string TimeoutIdHeaderKey = "NServiceBus.Saga.TimeoutId";
         static readonly ILog logger = LogManager.GetLogger<SagaPersistenceBehavior>();
     }
 }

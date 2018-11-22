@@ -9,7 +9,7 @@ namespace NServiceBus
     class LoadSagaByIdWrapper<T> : SagaLoader 
         where T : class, IContainSagaData
     {
-        public async Task<SagaInstance> Load(ISagaPersister2 persister, string sagaId, SynchronizedStorageSession storageSession, ContextBag context)
+        public async Task<PersistentSagaInstance> Load(ISagaPersister2 persister, string sagaId, SynchronizedStorageSession storageSession, ContextBag context)
         {
             return await persister.Get<T>(sagaId, storageSession, context).ConfigureAwait(false);
         }

@@ -6,16 +6,16 @@ namespace NServiceBus.Sagas
 
     interface ISagaPersister2
     {
-        Task Save(SagaInstance sagaInstance, SagaCorrelationProperty correlationProperty, SynchronizedStorageSession session, ContextBag context);
+        Task Save(PersistentSagaInstance persistentSagaInstance, SagaCorrelationProperty correlationProperty, SynchronizedStorageSession session, ContextBag context);
 
-        Task Update(SagaInstance sagaInstance, SynchronizedStorageSession session, ContextBag context);
+        Task Update(PersistentSagaInstance persistentSagaInstance, SynchronizedStorageSession session, ContextBag context);
 
-        Task<SagaInstance> Get<TSagaData>(string sagaId, SynchronizedStorageSession session, ContextBag context)
+        Task<PersistentSagaInstance> Get<TSagaData>(string sagaId, SynchronizedStorageSession session, ContextBag context)
             where TSagaData : class, IContainSagaData;
 
-        Task<SagaInstance> Get<TSagaData>(string propertyName, object propertyValue, SynchronizedStorageSession session, ContextBag context)
+        Task<PersistentSagaInstance> Get<TSagaData>(string propertyName, object propertyValue, SynchronizedStorageSession session, ContextBag context)
             where TSagaData : class, IContainSagaData;
 
-        Task Complete(SagaInstance sagaInstance, SynchronizedStorageSession session, ContextBag context);
+        Task Complete(PersistentSagaInstance persistentSagaInstance, SynchronizedStorageSession session, ContextBag context);
     }
 }

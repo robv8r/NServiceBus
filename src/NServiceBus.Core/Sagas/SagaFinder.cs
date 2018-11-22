@@ -8,6 +8,6 @@
 
     abstract class SagaFinder
     {
-        public abstract Task<SagaInstance> Find(IBuilder builder, SagaFinderDefinition finderDefinition, SynchronizedStorageSession storageSession, ContextBag context, object message);
+        public abstract Task<PersistentSagaInstance> Find(IBuilder builder, SagaFinderDefinition finderDefinition, SynchronizedStorageSession storageSession, ContextBag context, object message);
     }
 }

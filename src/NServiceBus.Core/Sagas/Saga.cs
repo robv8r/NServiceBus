@@ -1,6 +1,7 @@
 namespace NServiceBus
 {
     using System;
+    using System.Collections;
     using System.Collections.Generic;
     using System.Threading.Tasks;
 
@@ -58,6 +59,7 @@ namespace NServiceBus
             RequestedTimeouts.Add(new RequestedTimeout
             {
                 Id = CombGuid.Generate().ToString(),
+                Type = typeof(TTimeoutMessageType).FullName,
                 Message = timeoutMessage,
                 At = at
             });
@@ -87,7 +89,8 @@ namespace NServiceBus
 
             RequestedTimeouts.Add(new RequestedTimeout
             {
-                Id = CombGuid.Generate().ToString(), 
+                Id = CombGuid.Generate().ToString(),
+                Type = typeof(TTimeoutMessageType).FullName,
                 Message = timeoutMessage,
                 Within = within
             });
@@ -95,6 +98,23 @@ namespace NServiceBus
             return TaskEx.CompletedTask;
         }
 
+        /// <summary>
+        /// Cancels all timeouts of the given type
+        /// </summary>
+        /// <typeparam name="TTimeoutMessageType">Timeout type to cancel.</typeparam>
+        protected Task CancelTimeout<TTimeoutMessageType>()
+        {
+            foreach (var timeout in ExistingTimeouts)
+            {
+                if (timeout.Type == typeof(TTimeoutMessageType).FullName)
+                {
+                    timeout.Canceled = true;
+                }
+            }
+
+            return TaskEx.CompletedTask;
+        }
+        
         /// <summary>
         /// Sends the <paramref name="message" /> using the bus to the endpoint that caused this saga to start.
         /// </summary>
@@ -142,6 +162,8 @@ namespace NServiceBus
         }
 
         internal List<RequestedTimeout> RequestedTimeouts = new List<RequestedTimeout>();
+        internal List<ExistingTimeout> ExistingTimeouts = new List<ExistingTimeout>();
+
     }
 
     class RequestedTimeout
@@ -150,5 +172,13 @@ namespace NServiceBus
         public object Message { get; set; }
         public TimeSpan? Within { get; set; }
         public DateTime? At { get; set; }
+        public string Type { get; set; }
+    }
+
+    class ExistingTimeout
+    {
+        public string Type { get; set; }
+
+        public bool Canceled { get; set; }
     }
 }

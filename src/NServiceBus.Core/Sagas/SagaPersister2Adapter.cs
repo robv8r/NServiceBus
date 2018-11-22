@@ -1,7 +1,6 @@
 namespace NServiceBus.Sagas
 {
     using System;
-    using System.ComponentModel;
     using System.Threading.Tasks;
     using Extensibility;
     using Persistence;
@@ -13,39 +12,39 @@ namespace NServiceBus.Sagas
             this.persister = persister;
         }
 
-        public Task Save(SagaInstance sagaInstance, SagaCorrelationProperty correlationProperty, SynchronizedStorageSession session, ContextBag context)
+        public Task Save(PersistentSagaInstance persistentSagaInstance, SagaCorrelationProperty correlationProperty, SynchronizedStorageSession session, ContextBag context)
         {
-            return persister.Save(sagaInstance.Entity, correlationProperty, session, context);
+            return persister.Save(persistentSagaInstance.Entity, correlationProperty, session, context);
         }
 
-        public Task Update(SagaInstance sagaInstance, SynchronizedStorageSession session, ContextBag context)
+        public Task Update(PersistentSagaInstance persistentSagaInstance, SynchronizedStorageSession session, ContextBag context)
         {
-            return persister.Update(sagaInstance.Entity, session, context);
+            return persister.Update(persistentSagaInstance.Entity, session, context);
         }
 
-        public async Task<SagaInstance> Get<TSagaData>(string sagaId, SynchronizedStorageSession session, ContextBag context) where TSagaData : class, IContainSagaData
+        public async Task<PersistentSagaInstance> Get<TSagaData>(string sagaId, SynchronizedStorageSession session, ContextBag context) where TSagaData : class, IContainSagaData
         {
             var entity = await persister.Get<TSagaData>(Guid.Parse(sagaId), session, context).ConfigureAwait(false);
 
-            return new SagaInstance
+            return new PersistentSagaInstance
             {
                 Entity = entity
             };
         }
 
-        public async Task<SagaInstance> Get<TSagaData>(string propertyName, object propertyValue, SynchronizedStorageSession session, ContextBag context) where TSagaData : class, IContainSagaData
+        public async Task<PersistentSagaInstance> Get<TSagaData>(string propertyName, object propertyValue, SynchronizedStorageSession session, ContextBag context) where TSagaData : class, IContainSagaData
         {
             var entity = await persister.Get<TSagaData>(propertyName, propertyValue, session, context).ConfigureAwait(false);
 
-            return new SagaInstance
+            return new PersistentSagaInstance
             {
                 Entity = entity
             };
         }
 
-        public Task Complete(SagaInstance sagaInstance, SynchronizedStorageSession session, ContextBag context)
+        public Task Complete(PersistentSagaInstance persistentSagaInstance, SynchronizedStorageSession session, ContextBag context)
         {
-            return persister.Complete(sagaInstance.Entity, session, context);
+            return persister.Complete(persistentSagaInstance.Entity, session, context);
         }
 
         readonly ISagaPersister persister;
