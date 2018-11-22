@@ -27,7 +27,7 @@ namespace NServiceBus.Sagas
         /// <summary>
         /// The id of the saga.
         /// </summary>
-        public string SagaId { get; private set; }
+        public string SagaId => Instance.Entity.Id.ToString();
 
         /// <summary>
         /// Metadata for this active saga.
@@ -89,10 +89,9 @@ namespace NServiceBus.Sagas
 
         void AttachPersistentSagaInstance(PersistentSagaInstance instance)
         {
-            sagaId = instance.Entity.Id;
             UpdateModified();
-            Instance.Entity = instance.Entity;
-            SagaId = instance.Entity.Id.ToString();
+            Instance.Entity = (IContainSagaData)instance.Entity;
+            sagaId = Instance.Entity.Id;
 
             var properties = instance.Entity.GetType().GetProperties();
 

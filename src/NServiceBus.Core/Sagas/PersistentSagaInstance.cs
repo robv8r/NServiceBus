@@ -8,7 +8,7 @@ namespace NServiceBus.Sagas
         {
             Timeouts = new List<Timeout>();
         }
-        public IContainSagaData Entity;
+        public object Entity;
         
         public bool Found => Entity != null;
 

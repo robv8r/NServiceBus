@@ -58,6 +58,7 @@
             }
 
             var persisterSupportsTimeoutStorage = true;
+
             if (!context.Container.HasComponent<ISagaPersister2>())
             {
                 persisterSupportsTimeoutStorage = false;
