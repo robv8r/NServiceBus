@@ -4,15 +4,21 @@ namespace NServiceBus.Sagas
 
     class PersistentSagaInstance
     {
-        public PersistentSagaInstance()
+        public PersistentSagaInstance(string id, string type)
         {
             Timeouts = new List<Timeout>();
+            Id = id;
+            Type = type;
         }
-        public object Entity;
-        
-        public bool Found => Entity != null;
+
+        public string Id { get; }
+
+        public string Type { get; }
+
+        public object Entity { get; set; }
 
         public IList<Timeout> Timeouts { get; set; }
+
 
         public class Timeout
         {
@@ -20,5 +26,7 @@ namespace NServiceBus.Sagas
             public string Type { get; set; }
             public bool Canceled { get; set; }
         }
+
+        //metadata
     }
 }

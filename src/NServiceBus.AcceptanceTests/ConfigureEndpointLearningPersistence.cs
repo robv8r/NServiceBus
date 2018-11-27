@@ -28,7 +28,7 @@ public class ConfigureEndpointLearningPersistence : IConfigureEndpointTestExecut
         configuration.UsePersistence<InMemoryPersistence, StorageType.Subscriptions>();
         configuration.UsePersistence<InMemoryPersistence, StorageType.Timeouts>();
 
-        configuration.UsePersistence<LearningPersistence, StorageType.Sagas>()
+        configuration.UsePersistence<LearningPersistence, StorageType.SagasV2>()
             .SagaStorageDirectory(storageDir);
 
         return Task.FromResult(0);

@@ -50,13 +50,23 @@
         /// <summary>
         /// Storage for sagas.
         /// </summary>
-        public sealed class Sagas : StorageType
+        public class Sagas : StorageType
         {
             internal Sagas() : base("Sagas")
             {
             }
         }
 
+        /// <summary>
+        /// Next gen saga storage
+        /// </summary>
+        public sealed class SagasV2 : StorageType
+        {
+            internal SagasV2() : base("SagasV2")
+            {
+            }
+        }
+        
         /// <summary>
         /// Storage for gateway de-duplication.
         /// </summary>

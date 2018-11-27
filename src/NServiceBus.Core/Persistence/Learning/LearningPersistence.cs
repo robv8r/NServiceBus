@@ -11,6 +11,7 @@
         internal LearningPersistence()
         {
             Supports<StorageType.Sagas>(s => s.EnableFeatureByDefault<LearningSagaPersistence>());
+            Supports<StorageType.SagasV2>(s => s.EnableFeatureByDefault<LearningSagaPersistence>());
         }
     }
 }

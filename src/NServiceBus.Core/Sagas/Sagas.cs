@@ -37,7 +37,7 @@
         /// </summary>
         protected internal override void Setup(FeatureConfigurationContext context)
         {
-            if (!PersistenceStartup.HasSupportFor<StorageType.Sagas>(context.Settings))
+            if (!PersistenceStartup.HasSupportFor<StorageType.Sagas>(context.Settings) && !PersistenceStartup.HasSupportFor<StorageType.SagasV2>(context.Settings))
             {
                 throw new Exception("The selected persistence doesn't have support for saga storage. Select another persistence or disable the sagas feature using endpointConfiguration.DisableFeature<Sagas>()");
             }
@@ -59,10 +59,10 @@
 
             var persisterSupportsTimeoutStorage = true;
 
-            if (!context.Container.HasComponent<ISagaPersister2>())
+            if (!PersistenceStartup.HasSupportFor<StorageType.SagasV2>(context.Settings))
             {
                 persisterSupportsTimeoutStorage = false;
-                context.Container.ConfigureComponent<ISagaPersister2>(b=>new SagaPersister2Adapter(b.Build<ISagaPersister>()),DependencyLifecycle.SingleInstance);
+                context.Container.ConfigureComponent<ISagaPersister2>(b => new SagaPersister2Adapter(b.Build<ISagaPersister>()), DependencyLifecycle.SingleInstance);
             }
 
             // Register the Saga related behaviors for incoming messages

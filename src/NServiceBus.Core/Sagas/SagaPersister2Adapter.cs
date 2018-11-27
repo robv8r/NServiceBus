@@ -2,8 +2,6 @@ namespace NServiceBus.Sagas
 {
     using System;
     using System.Threading.Tasks;
-    using Extensibility;
-    using Persistence;
 
     class SagaPersister2Adapter : ISagaPersister2
     {
@@ -12,39 +10,51 @@ namespace NServiceBus.Sagas
             this.persister = persister;
         }
 
-        public Task Save(PersistentSagaInstance persistentSagaInstance, SagaCorrelationProperty correlationProperty, SynchronizedStorageSession session, ContextBag context)
+        public Task<PersistentSagaInstance> PrepareNewInstance(string sagaType, string correlationPropertyValue, SagaPersisterContext context)
         {
-            return persister.Save((IContainSagaData)persistentSagaInstance.Entity, correlationProperty, session, context);
+            throw new NotImplementedException();
         }
 
-        public Task Update(PersistentSagaInstance persistentSagaInstance, SynchronizedStorageSession session, ContextBag context)
+        public Task Save(PersistentSagaInstance persistentSagaInstance, SagaPersisterContext context)
         {
-            return persister.Update((IContainSagaData)persistentSagaInstance.Entity, session, context);
+            //SagaCorrelationProperty correlationProperty;
+
+            //if(!context.SagaMetadata.TryGetCorrelationProperty())
+
+            return persister.Save((IContainSagaData)persistentSagaInstance.Entity, null, context.Session, context.Extensions);
         }
 
-        public async Task<PersistentSagaInstance> Get<TSagaData>(string sagaId, SynchronizedStorageSession session, ContextBag context) where TSagaData : class, IContainSagaData
+        public Task Update(PersistentSagaInstance persistentSagaInstance, SagaPersisterContext context)
         {
-            var entity = await persister.Get<TSagaData>(Guid.Parse(sagaId), session, context).ConfigureAwait(false);
-
-            return new PersistentSagaInstance
-            {
-                Entity = entity
-            };
+            return persister.Update((IContainSagaData)persistentSagaInstance.Entity, context.Session, context.Extensions);
         }
 
-        public async Task<PersistentSagaInstance> Get<TSagaData>(string propertyName, object propertyValue, SynchronizedStorageSession session, ContextBag context) where TSagaData : class, IContainSagaData
+        public Task<PersistentSagaInstance> Get(string sagaType, string sagaId, SagaPersisterContext context)
         {
-            var entity = await persister.Get<TSagaData>(propertyName, propertyValue, session, context).ConfigureAwait(false);
+            throw new NotImplementedException();
+            //var entity = await persister.Get<TSagaData>(Guid.Parse(sagaId), session, context).ConfigureAwait(false);
 
-            return new PersistentSagaInstance
-            {
-                Entity = entity
-            };
+            //return new PersistentSagaInstance
+            //{
+            //    Entity = entity
+            //};
         }
 
-        public Task Complete(PersistentSagaInstance persistentSagaInstance, SynchronizedStorageSession session, ContextBag context)
+        public Task<PersistentSagaInstance> GetByCorrelationProperty(string sagaType, string correlationPropertyValue, SagaPersisterContext context)
         {
-            return persister.Complete((IContainSagaData)persistentSagaInstance.Entity, session, context);
+            throw new NotImplementedException();
+
+            //var entity = await persister.Get<TSagaData>(propertyName, propertyValue, session, context).ConfigureAwait(false);
+
+            //return new PersistentSagaInstance
+            //{
+            //    Entity = entity
+            //};
+        }
+
+        public Task Complete(PersistentSagaInstance persistentSagaInstance, SagaPersisterContext context)
+        {
+            return persister.Complete((IContainSagaData)persistentSagaInstance.Entity, context.Session, context.Extensions);
         }
 
         readonly ISagaPersister persister;

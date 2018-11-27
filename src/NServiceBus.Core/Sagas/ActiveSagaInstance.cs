@@ -75,11 +75,16 @@ namespace NServiceBus.Sagas
         public void AttachNewEntity(IContainSagaData sagaEntity)
         {
             Guard.AgainstNull(nameof(sagaEntity), sagaEntity);
+
+            Instance.Entity = sagaEntity;
+        }
+
+        internal void AttachNewPersistentInstance(PersistentSagaInstance instance)
+        {
+            Guard.AgainstNull(nameof(instance), instance);
             IsNew = true;
-            AttachPersistentSagaInstance(new PersistentSagaInstance
-            {
-                Entity = sagaEntity
-            });
+
+            AttachPersistentSagaInstance(instance);
         }
 
         internal void AttachExistingPersistentInstance(PersistentSagaInstance loadedInstance)

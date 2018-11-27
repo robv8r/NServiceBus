@@ -3,9 +3,7 @@ namespace NServiceBus
     using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
-    using Extensibility;
     using ObjectBuilder;
-    using Persistence;
     using Sagas;
 
     class PropertySagaFinder<TSagaData> : SagaFinder where TSagaData : class, IContainSagaData
@@ -15,22 +13,22 @@ namespace NServiceBus
             this.sagaPersister = sagaPersister;
         }
 
-        public override async Task<PersistentSagaInstance> Find(IBuilder builder, SagaFinderDefinition finderDefinition, SynchronizedStorageSession storageSession, ContextBag context, object message)
+        public override async Task<PersistentSagaInstance> Find(IBuilder builder, SagaFinderDefinition finderDefinition, SagaPersisterContext context, object message, string sagaType)
         {
-            var propertyAccessor = (Func<object, object>) finderDefinition.Properties["property-accessor"];
+            var propertyAccessor = (Func<object, object>)finderDefinition.Properties["property-accessor"];
             var propertyValue = propertyAccessor(message);
 
-            var sagaPropertyName = (string) finderDefinition.Properties["saga-property-name"];
+            var sagaPropertyName = (string)finderDefinition.Properties["saga-property-name"];
 
-            var lookupValues = context.GetOrCreate<SagaLookupValues>();
+            var lookupValues = context.Extensions.GetOrCreate<SagaLookupValues>();
             lookupValues.Add<TSagaData>(sagaPropertyName, propertyValue);
 
             if (sagaPropertyName.ToLower() == "id")
             {
-                return await sagaPersister.Get<TSagaData>(((Guid) propertyValue).ToString(), storageSession, context).ConfigureAwait(false);
+                return await sagaPersister.Get(sagaType, ((Guid)propertyValue).ToString(), context).ConfigureAwait(false);
             }
 
-            return await sagaPersister.Get<TSagaData>(sagaPropertyName, propertyValue, storageSession, context).ConfigureAwait(false);
+            return await sagaPersister.GetByCorrelationProperty(sagaType, propertyValue.ToString(), context).ConfigureAwait(false);
         }
 
         ISagaPersister2 sagaPersister;

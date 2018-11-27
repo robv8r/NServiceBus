@@ -2,10 +2,11 @@ namespace NServiceBus
 {
     using System.Collections.Generic;
     using System.Threading.Tasks;
+    using Sagas;
 
     class CompleteAction : StorageAction
     {
-        public CompleteAction(IContainSagaData sagaData, Dictionary<string, SagaStorageFile> sagaFiles, SagaManifestCollection sagaManifests) : base(sagaData, sagaFiles, sagaManifests)
+        public CompleteAction(PersistentSagaInstance sagaData, Dictionary<string, SagaStorageFile> sagaFiles, SagaManifestCollection sagaManifests) : base(sagaData, sagaFiles, sagaManifests)
         {
         }
 

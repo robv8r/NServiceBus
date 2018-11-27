@@ -9,7 +9,6 @@
         internal LearningSagaPersistence()
         {
             DependsOn<Sagas>();
-            Defaults(s => s.Set<ISagaIdGenerator>(new LearningSagaIdGenerator()));
             Defaults(s => s.SetDefault(StorageLocationKey, Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".sagas")));
         }
 

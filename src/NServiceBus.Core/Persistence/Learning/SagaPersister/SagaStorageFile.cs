@@ -1,10 +1,12 @@
 namespace NServiceBus
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using System.Text;
     using System.Threading.Tasks;
     using Janitor;
+    using Sagas;
     using SimpleJson;
 
     [SkipWeaving]
@@ -30,7 +32,7 @@ namespace NServiceBus
             fileStream = null;
         }
 
-        public static Task<SagaStorageFile> Open(Guid sagaId, SagaManifest manifest)
+        public static Task<SagaStorageFile> Open(string sagaId, SagaManifest manifest)
         {
             var filePath = manifest.GetFilePath(sagaId);
 
@@ -42,7 +44,7 @@ namespace NServiceBus
             return OpenWithDelayOnConcurrency(filePath, FileMode.Open);
         }
 
-        public static Task<SagaStorageFile> Create(Guid sagaId, SagaManifest manifest)
+        public static Task<SagaStorageFile> Create(string sagaId, SagaManifest manifest)
         {
             var filePath = manifest.GetFilePath(sagaId);
 
@@ -65,10 +67,21 @@ namespace NServiceBus
             }
         }
 
-        public Task Write(IContainSagaData sagaData)
+        public Task Write(PersistentSagaInstance sagaData)
         {
             fileStream.Position = 0;
-            var json = SimpleJson.SerializeObject(sagaData, serializationStrategy);
+
+            var serializedEntity = SimpleJson.SerializeObject(sagaData.Entity, serializationStrategy);
+
+            var json = SimpleJson.SerializeObject(new StoredInstance
+            {
+                Id = sagaData.Id,
+                Type = sagaData.Type,
+                EntityType = sagaData.Entity.GetType().AssemblyQualifiedName,
+                EntityAsJson = serializedEntity,
+                Timeouts = sagaData.Timeouts
+            }, serializationStrategy);
+
             return streamWriter.WriteAsync(json);
         }
 
@@ -78,10 +91,16 @@ namespace NServiceBus
             return TaskEx.CompletedTask;
         }
 
-        public async Task<TSagaData> Read<TSagaData>() where TSagaData : class, IContainSagaData
+        public async Task<PersistentSagaInstance> Read()
         {
             var json = await streamReader.ReadToEndAsync().ConfigureAwait(false);
-            return SimpleJson.DeserializeObject<TSagaData>(json, serializationStrategy);
+            var storedInstance = SimpleJson.DeserializeObject<StoredInstance>(json, serializationStrategy);
+
+            return new PersistentSagaInstance(storedInstance.Id, storedInstance.Type)
+            {
+                Entity = SimpleJson.DeserializeObject(storedInstance.EntityAsJson, Type.GetType(storedInstance.EntityType), serializationStrategy),
+                Timeouts = storedInstance.Timeouts
+            };
         }
 
         FileStream fileStream;
@@ -92,5 +111,19 @@ namespace NServiceBus
         const int DefaultBufferSize = 4096;
         static Task<SagaStorageFile> noSagaFoundResult = Task.FromResult<SagaStorageFile>(null);
         static readonly EnumAwareStrategy serializationStrategy = new EnumAwareStrategy();
+
+
+        public class StoredInstance
+        {
+            public string Id;
+
+            public string Type;
+
+            public string EntityType;
+
+            public string EntityAsJson;
+
+            public IList<PersistentSagaInstance.Timeout> Timeouts;
+        }
     }
 }

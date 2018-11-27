@@ -3,15 +3,16 @@ namespace NServiceBus
     using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
+    using Sagas;
 
     abstract class StorageAction
     {
-        protected StorageAction(IContainSagaData sagaData, Dictionary<string, SagaStorageFile> sagaFiles, SagaManifestCollection sagaManifests)
+        protected StorageAction(PersistentSagaInstance sagaData, Dictionary<string, SagaStorageFile> sagaFiles, SagaManifestCollection sagaManifests)
         {
             this.sagaFiles = sagaFiles;
             this.sagaData = sagaData;
             this.sagaManifests = sagaManifests;
-            sagaFileKey = $"{sagaData.GetType().FullName}{sagaData.Id}";
+            sagaFileKey = $"{sagaData.Type}{sagaData.Id}";
         }
 
         public abstract Task Execute();
@@ -25,7 +26,7 @@ namespace NServiceBus
             return sagaFile;
         }
 
-        protected IContainSagaData sagaData;
+        protected PersistentSagaInstance sagaData;
         protected Dictionary<string, SagaStorageFile> sagaFiles;
         protected SagaManifestCollection sagaManifests;
 

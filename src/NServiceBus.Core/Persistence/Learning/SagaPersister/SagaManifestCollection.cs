@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using Sagas;
 
     class SagaManifestCollection
@@ -11,7 +12,8 @@
         {
             foreach (var metadata in sagas)
             {
-                var sagaStorageDir = Path.Combine(storageLocation, metadata.SagaType.FullName.Replace("+", ""));
+                var sagaType = metadata.SagaType.FullName;
+                var sagaStorageDir = Path.Combine(storageLocation, sagaType.Replace("+", ""));
 
                 if (!Directory.Exists(sagaStorageDir))
                 {
@@ -20,19 +22,19 @@
 
                 var manifest = new SagaManifest
                 {
-                    StorageDirectory = sagaStorageDir,
-                    SagaEntityType = metadata.SagaEntityType
+                    StorageDirectory = sagaStorageDir
                 };
 
-                sagaManifests[metadata.SagaEntityType] = manifest;
+                sagaManifests[sagaType] = manifest;
             }
         }
 
-        public SagaManifest GetForEntityType(Type type)
+        public SagaManifest GetForSagaType(string type)
         {
             return sagaManifests[type];
         }
+    
 
-        Dictionary<Type, SagaManifest> sagaManifests = new Dictionary<Type, SagaManifest>();
+        Dictionary<string, SagaManifest> sagaManifests = new Dictionary<string, SagaManifest>();
     }
 }

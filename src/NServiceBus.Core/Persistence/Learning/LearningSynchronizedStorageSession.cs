@@ -5,6 +5,7 @@ namespace NServiceBus
     using System.Threading.Tasks;
     using Janitor;
     using Persistence;
+    using Sagas;
 
     [SkipWeaving]
     class LearningSynchronizedStorageSession : CompletableSynchronizedStorageSession
@@ -33,9 +34,9 @@ namespace NServiceBus
             deferredActions.Clear();
         }
 
-        public async Task<TSagaData> Read<TSagaData>(Guid sagaId) where TSagaData : class, IContainSagaData
+        public async Task<PersistentSagaInstance> Read(string sagaId, string sagaType)
         {
-            var sagaStorageFile = await Open(sagaId, typeof(TSagaData))
+            var sagaStorageFile = await Open(sagaId, sagaType)
                 .ConfigureAwait(false);
 
             if (sagaStorageFile == null)
@@ -43,38 +44,38 @@ namespace NServiceBus
                 return null;
             }
 
-            return await sagaStorageFile.Read<TSagaData>()
+            return await sagaStorageFile.Read()
                 .ConfigureAwait(false);
         }
 
-        public Task Update(IContainSagaData sagaData)
+        public Task Update(PersistentSagaInstance sagaData)
         {
             deferredActions.Add(new UpdateAction(sagaData, sagaFiles, sagaManifests));
             return TaskEx.CompletedTask;
         }
 
-        public Task Save(IContainSagaData sagaData)
+        public Task Save(PersistentSagaInstance sagaData)
         {
             deferredActions.Add(new SaveAction(sagaData, sagaFiles, sagaManifests));
             return TaskEx.CompletedTask;
         }
 
-        public Task Complete(IContainSagaData sagaData)
+        public Task Complete(PersistentSagaInstance sagaData)
         {
             deferredActions.Add(new CompleteAction(sagaData, sagaFiles, sagaManifests));
             return TaskEx.CompletedTask;
         }
 
-        async Task<SagaStorageFile> Open(Guid sagaId, Type entityType)
+        async Task<SagaStorageFile> Open(string sagaId, string sagaType)
         {
-            var sagaManifest = sagaManifests.GetForEntityType(entityType);
+            var sagaManifest = sagaManifests.GetForSagaType(sagaType);
 
             var sagaStorageFile = await SagaStorageFile.Open(sagaId, sagaManifest)
                 .ConfigureAwait(false);
 
             if (sagaStorageFile != null)
             {
-                sagaFiles.RegisterSagaFile(sagaStorageFile, sagaId, sagaManifest.SagaEntityType);
+                sagaFiles.RegisterSagaFile(sagaStorageFile, sagaId, sagaType);
             }
 
             return sagaStorageFile;

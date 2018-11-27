@@ -1,13 +1,12 @@
 namespace NServiceBus
 {
-    using System;
     using System.Collections.Generic;
 
     static class SagaStorageFileExtensions
     {
-        public static void RegisterSagaFile(this Dictionary<string, SagaStorageFile> sagaFiles, SagaStorageFile sagaStorageFile, Guid sagaId, Type sagaDataType)
+        public static void RegisterSagaFile(this Dictionary<string, SagaStorageFile> sagaFiles, SagaStorageFile sagaStorageFile, string sagaId, string sagaType)
         {
-            sagaFiles[$"{sagaDataType.FullName}{sagaId}"] = sagaStorageFile;
+            sagaFiles[$"{sagaType}{sagaId}"] = sagaStorageFile;
         }
     }
 }

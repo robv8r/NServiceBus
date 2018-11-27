@@ -39,8 +39,8 @@
             builder.Register(() => new ReturnsNullFinder());
 
             var customerFinderAdapter = new CustomFinderAdapter<TestSaga.SagaData, StartSagaMessage>();
-
-            Assert.That(async () => await customerFinderAdapter.Find(builder, finderDefinition, new InMemorySynchronizedStorageSession(), new ContextBag(), new StartSagaMessage()),
+            var persisterContext = new SagaPersisterContext(sagaMetadata, new InMemorySynchronizedStorageSession(), new ContextBag());
+            Assert.That(async () => await customerFinderAdapter.Find(builder, finderDefinition, persisterContext, new StartSagaMessage(), sagaMetadata.SagaType.FullName),
                 Throws.Exception.With.Message.EqualTo("Return a Task or mark the method as async."));
         }
     }

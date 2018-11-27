@@ -2,46 +2,52 @@ namespace NServiceBus
 {
     using System;
     using System.Threading.Tasks;
-    using Extensibility;
-    using Persistence;
     using Sagas;
 
-    class LearningSagaPersister : ISagaPersister
+    class LearningSagaPersister : ISagaPersister2
     {
-        public Task Save(IContainSagaData sagaData, SagaCorrelationProperty correlationProperty, SynchronizedStorageSession session, ContextBag context)
+        public Task<PersistentSagaInstance> PrepareNewInstance(string sagaType, string correlationPropertyValue, SagaPersisterContext context)
         {
-            var storageSession = (LearningSynchronizedStorageSession)session;
-            return storageSession.Save(sagaData);
+            if (correlationPropertyValue == null)
+            {
+                throw new InvalidOperationException("The persister requires a correlation property to be defined for messages starting sagas");
+            }
+
+            return Task.FromResult(new PersistentSagaInstance(GenerateSagaId(sagaType, correlationPropertyValue), sagaType));
         }
 
-        public Task Update(IContainSagaData sagaData, SynchronizedStorageSession session, ContextBag context)
+        public Task Save(PersistentSagaInstance persistentSagaInstance, SagaPersisterContext context)
         {
-            var storageSession = (LearningSynchronizedStorageSession)session;
-            return storageSession.Update(sagaData);
+            var storageSession = (LearningSynchronizedStorageSession)context.Session;
+            return storageSession.Save(persistentSagaInstance);
         }
 
-        public Task<TSagaData> Get<TSagaData>(Guid sagaId, SynchronizedStorageSession session, ContextBag context) 
-            where TSagaData : class, IContainSagaData
+        public Task Update(PersistentSagaInstance persistentSagaInstance, SagaPersisterContext context)
         {
-            return Get<TSagaData>(sagaId, session);
+            var storageSession = (LearningSynchronizedStorageSession)context.Session;
+            return storageSession.Update(persistentSagaInstance);
         }
 
-        public Task<TSagaData> Get<TSagaData>(string propertyName, object propertyValue, SynchronizedStorageSession session, ContextBag context)
-            where TSagaData : class, IContainSagaData
+        public Task<PersistentSagaInstance> Get(string sagaType, string sagaId, SagaPersisterContext context)
         {
-            return Get<TSagaData>(LearningSagaIdGenerator.Generate(typeof(TSagaData), propertyName, propertyValue), session);
+            var storageSession = (LearningSynchronizedStorageSession)context.Session;
+            return storageSession.Read(sagaId, sagaType);
         }
 
-        public Task Complete(IContainSagaData sagaData, SynchronizedStorageSession session, ContextBag context)
+        public Task<PersistentSagaInstance> GetByCorrelationProperty(string sagaType, string correlationPropertyValue, SagaPersisterContext context)
         {
-            var storageSession = (LearningSynchronizedStorageSession)session;
-            return storageSession.Complete(sagaData);
+            return Get(sagaType, GenerateSagaId(sagaType, correlationPropertyValue), context);
         }
 
-        static Task<TSagaData> Get<TSagaData>(Guid sagaId, SynchronizedStorageSession session) where TSagaData : class, IContainSagaData
+        public Task Complete(PersistentSagaInstance persistentSagaInstance, SagaPersisterContext context)
         {
-            var storageSession = (LearningSynchronizedStorageSession)session;
-            return storageSession.Read<TSagaData>(sagaId);
+            var storageSession = (LearningSynchronizedStorageSession)context.Session;
+            return storageSession.Complete(persistentSagaInstance);
+        }
+
+        string GenerateSagaId(string sagaType, string propertyValue)
+        {
+            return DeterministicGuid.Create($"{sagaType}_{propertyValue}").ToString();
         }
     }
 }

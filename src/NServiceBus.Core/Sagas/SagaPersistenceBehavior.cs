@@ -4,6 +4,7 @@
     using System.Collections.Generic;
     using System.ComponentModel;
     using System.Linq;
+    using System.Reflection;
     using System.Threading.Tasks;
     using Logging;
     using Pipeline;
@@ -45,7 +46,6 @@
             }
 
             var currentSagaMetadata = sagaMetadataCollection.Find(context.MessageHandler.Instance.GetType());
-
             if (context.Headers.TryGetValue(Headers.SagaType, out var targetSagaTypeString) && context.Headers.TryGetValue(Headers.SagaId, out var targetSagaId))
             {
                 var targetSagaType = Type.GetType(targetSagaTypeString, false);
@@ -71,23 +71,47 @@
                 }
             }
 
+            var persisterContext = new SagaPersisterContext(currentSagaMetadata, context.SynchronizedStorageSession, context.Extensions);
+
             var sagaInstanceState = new ActiveSagaInstance(saga, currentSagaMetadata, () => DateTime.UtcNow);
 
             //so that other behaviors can access the saga
             context.Extensions.Set(sagaInstanceState);
 
-            var persistentInstance = await TryLoadSagaEntity(currentSagaMetadata, context).ConfigureAwait(false);
+            var persistentInstance = await TryLoadSagaInstance(persisterContext, context).ConfigureAwait(false);
 
-            if (!persistentInstance.Found)
+            if (persistentInstance == null)
             {
                 if (IsMessageAllowedToStartTheSaga(context, currentSagaMetadata))
                 {
                     context.Extensions.Get<SagaInvocationResult>().SagaFound();
-                    var entity = CreateNewSagaEntity(currentSagaMetadata, context);
 
-                    persistentInstance.Entity = entity;
+                    var lookupValues = context.Extensions.GetOrCreate<SagaLookupValues>();
 
-                    sagaInstanceState.AttachNewEntity(CreateNewSagaEntity(currentSagaMetadata, context));
+                    
+                    var sagaEntityType = currentSagaMetadata.SagaEntityType;
+                    object correlationPropertyValue = null;
+                    PropertyInfo propertyInfo = null;
+
+                    if (lookupValues.TryGet(sagaEntityType, out var value))
+                    {
+                        propertyInfo = sagaEntityType.GetProperty(value.PropertyName);
+
+                        correlationPropertyValue = TypeDescriptor.GetConverter(propertyInfo.PropertyType)
+                            .ConvertFromInvariantString(value.PropertyValue.ToString());
+                    }
+                   
+
+                    persistentInstance = await sagaPersister.PrepareNewInstance(currentSagaMetadata.SagaType.FullName, correlationPropertyValue?.ToString(), persisterContext).ConfigureAwait(false);
+
+                    persistentInstance.Entity = CreateNewSagaEntity(persistentInstance.Id, currentSagaMetadata, context);
+
+                    if (propertyInfo != null)
+                    {
+                        propertyInfo.SetValue(persistentInstance.Entity, correlationPropertyValue);
+                    }
+
+                    sagaInstanceState.AttachNewPersistentInstance(persistentInstance);
                 }
                 else
                 {
@@ -147,7 +171,7 @@
             {
                 if (!sagaInstanceState.IsNew)
                 {
-                    await sagaPersister.Complete(persistentInstance, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
+                    await sagaPersister.Complete(persistentInstance, persisterContext).ConfigureAwait(false);
                 }
 
                 if (saga.Entity.Id != Guid.Empty)
@@ -195,18 +219,11 @@
 
                 if (sagaInstanceState.IsNew)
                 {
-                    var sagaCorrelationProperty = SagaCorrelationProperty.None;
-
-                    if (sagaInstanceState.TryGetCorrelationProperty(out var correlationProperty))
-                    {
-                        sagaCorrelationProperty = new SagaCorrelationProperty(correlationProperty.PropertyInfo.Name, correlationProperty.PropertyInfo.GetValue(sagaInstanceState.Instance.Entity));
-                    }
-
-                    await sagaPersister.Save(persistentInstance, sagaCorrelationProperty, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
+                    await sagaPersister.Save(persistentInstance, persisterContext).ConfigureAwait(false);
                 }
                 else
                 {
-                    await sagaPersister.Update(persistentInstance, context.SynchronizedStorageSession, context.Extensions).ConfigureAwait(false);
+                    await sagaPersister.Update(persistentInstance, persisterContext).ConfigureAwait(false);
                 }
 
                 sagaInstanceState.Updated();
@@ -288,9 +305,13 @@
             return true;
         }
 
-        Task<PersistentSagaInstance> TryLoadSagaEntity(SagaMetadata metadata, IInvokeHandlerContext context)
+        Task<PersistentSagaInstance> TryLoadSagaInstance(SagaPersisterContext sagaPersisterContext, IInvokeHandlerContext invokeHandlerContext)
         {
-            if (context.Headers.TryGetValue(Headers.SagaId, out var sagaId) && !string.IsNullOrEmpty(sagaId))
+            var metadata = sagaPersisterContext.SagaMetadata;
+
+            var sagaType = metadata.SagaType.FullName;
+
+            if (invokeHandlerContext.Headers.TryGetValue(Headers.SagaId, out var sagaId) && !string.IsNullOrEmpty(sagaId))
             {
                 var sagaEntityType = metadata.SagaEntityType;
 
@@ -299,10 +320,10 @@
 
                 var loader = (SagaLoader)Activator.CreateInstance(loaderType);
 
-                return loader.Load(sagaPersister, sagaId, context.SynchronizedStorageSession, context.Extensions);
+                return loader.Load(sagaPersister, sagaType, sagaId, sagaPersisterContext);
             }
 
-            var finderDefinition = GetSagaFinder(metadata, context);
+            var finderDefinition = GetSagaFinder(metadata, invokeHandlerContext);
 
             //check if we could find a finder
             if (finderDefinition == null)
@@ -311,9 +332,9 @@
             }
 
             var finderType = finderDefinition.Type;
-            var finder = (SagaFinder)context.Builder.Build(finderType);
+            var finder = (SagaFinder)invokeHandlerContext.Builder.Build(finderType);
 
-            return finder.Find(context.Builder, finderDefinition, context.SynchronizedStorageSession, context.Extensions, context.MessageBeingHandled);
+            return finder.Find(invokeHandlerContext.Builder, finderDefinition, sagaPersisterContext, invokeHandlerContext.MessageBeingHandled, sagaType);
         }
 
         SagaFinderDefinition GetSagaFinder(SagaMetadata metadata, IInvokeHandlerContext context)
@@ -328,12 +349,14 @@
             return null;
         }
 
-        IContainSagaData CreateNewSagaEntity(SagaMetadata metadata, IInvokeHandlerContext context)
+        IContainSagaData CreateNewSagaEntity(string sagaId, SagaMetadata metadata, IInvokeHandlerContext context)
         {
             var sagaEntityType = metadata.SagaEntityType;
 
             var sagaEntity = (IContainSagaData)Activator.CreateInstance(sagaEntityType);
 
+            //todo: What if the persister returned a string? can we get away with converting to a deterministic GUID?
+            sagaEntity.Id = Guid.Parse(sagaId);
             sagaEntity.OriginalMessageId = context.MessageId;
 
             if (context.Headers.TryGetValue(Headers.ReplyToAddress, out var replyToAddress))
@@ -341,29 +364,29 @@
                 sagaEntity.Originator = replyToAddress;
             }
 
-            var lookupValues = context.Extensions.GetOrCreate<SagaLookupValues>();
+            //var lookupValues = context.Extensions.GetOrCreate<SagaLookupValues>();
 
-            SagaCorrelationProperty correlationProperty;
+            //SagaCorrelationProperty correlationProperty;
 
-            if (lookupValues.TryGet(sagaEntityType, out var value))
-            {
-                var propertyInfo = sagaEntityType.GetProperty(value.PropertyName);
+            //if (lookupValues.TryGet(sagaEntityType, out var value))
+            //{
+            //    var propertyInfo = sagaEntityType.GetProperty(value.PropertyName);
 
-                var convertedValue = TypeDescriptor.GetConverter(propertyInfo.PropertyType)
-                    .ConvertFromInvariantString(value.PropertyValue.ToString());
+            //    var convertedValue = TypeDescriptor.GetConverter(propertyInfo.PropertyType)
+            //        .ConvertFromInvariantString(value.PropertyValue.ToString());
 
-                propertyInfo.SetValue(sagaEntity, convertedValue);
+            //    propertyInfo.SetValue(sagaEntity, convertedValue);
 
-                correlationProperty = new SagaCorrelationProperty(value.PropertyName, value.PropertyValue);
-            }
-            else
-            {
-                correlationProperty = SagaCorrelationProperty.None;
-            }
+            //    correlationProperty = new SagaCorrelationProperty(value.PropertyName, value.PropertyValue);
+            //}
+            //else
+            //{
+            //    correlationProperty = SagaCorrelationProperty.None;
+            //}
 
-            var sagaIdGeneratorContext = new SagaIdGeneratorContext(correlationProperty, metadata, context.Extensions);
+            //var sagaIdGeneratorContext = new SagaIdGeneratorContext(correlationProperty, metadata, context.Extensions);
 
-            sagaEntity.Id = sagaIdGenerator.Generate(sagaIdGeneratorContext);
+            //sagaEntity.Id = sagaIdGenerator.Generate(sagaIdGeneratorContext);
 
             return sagaEntity;
         }
