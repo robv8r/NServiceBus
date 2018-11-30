@@ -42,7 +42,6 @@
                 throw new Exception("The selected persistence doesn't have support for saga storage. Select another persistence or disable the sagas feature using endpointConfiguration.DisableFeature<Sagas>()");
             }
 
-            var sagaIdGenerator = context.Settings.GetOrDefault<ISagaIdGenerator>() ?? new DefaultSagaIdGenerator();
 
             var sagaMetaModel = context.Settings.Get<SagaMetadataCollection>();
             sagaMetaModel.Initialize(context.Settings.GetAvailableTypes(), conventions);
@@ -62,11 +61,11 @@
             if (!PersistenceStartup.HasSupportFor<StorageType.SagasV2>(context.Settings))
             {
                 persisterSupportsTimeoutStorage = false;
-                context.Container.ConfigureComponent<ISagaPersister2>(b => new SagaPersister2Adapter(b.Build<ISagaPersister>()), DependencyLifecycle.SingleInstance);
+                context.Container.ConfigureComponent<ISagaPersister2>(b => new SagaPersister2Adapter(b.Build<ISagaPersister>(), context.Settings.GetOrDefault<ISagaIdGenerator>() ?? new DefaultSagaIdGenerator()), DependencyLifecycle.SingleInstance);
             }
 
             // Register the Saga related behaviors for incoming messages
-            context.Pipeline.Register("InvokeSaga", b => new SagaPersistenceBehavior(b.Build<ISagaPersister2>(), sagaIdGenerator, b.Build<ICancelDeferredMessages>(), sagaMetaModel, persisterSupportsTimeoutStorage), "Invokes the saga logic");
+            context.Pipeline.Register("InvokeSaga", b => new SagaPersistenceBehavior(b.Build<ISagaPersister2>(), b.Build<ICancelDeferredMessages>(), sagaMetaModel, persisterSupportsTimeoutStorage), "Invokes the saga logic");
             context.Pipeline.Register("InvokeSagaNotFound", new InvokeSagaNotFoundBehavior(), "Invokes saga not found logic");
             context.Pipeline.Register("AttachSagaDetailsToOutGoingMessage", new AttachSagaDetailsToOutGoingMessageBehavior(), "Makes sure that outgoing messages have saga info attached to them");
         }

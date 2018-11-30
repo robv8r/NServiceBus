@@ -6,7 +6,7 @@ namespace NServiceBus.Sagas
 
     interface ISagaPersister2
     {
-        Task<PersistentSagaInstance> PrepareNewInstance(string sagaType, string correlationPropertyValue, SagaPersisterContext context);
+        Task<PersistentSagaInstance> PrepareNewInstance(string sagaType, object correlationPropertyValue, SagaPersisterContext context);
 
         Task Save(PersistentSagaInstance persistentSagaInstance, SagaPersisterContext context);
 
@@ -14,7 +14,7 @@ namespace NServiceBus.Sagas
 
         Task<PersistentSagaInstance> Get(string sagaType, string sagaId, SagaPersisterContext context);
 
-        Task<PersistentSagaInstance> GetByCorrelationProperty(string sagaType, string correlationPropertyValue, SagaPersisterContext context);
+        Task<PersistentSagaInstance> GetByCorrelationProperty(string sagaType, object correlationPropertyValue, SagaPersisterContext context);
 
         Task Complete(PersistentSagaInstance persistentSagaInstance, SagaPersisterContext context);
     }

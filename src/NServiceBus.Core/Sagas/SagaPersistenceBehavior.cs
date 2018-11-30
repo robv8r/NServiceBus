@@ -13,9 +13,8 @@
 
     class SagaPersistenceBehavior : IBehavior<IInvokeHandlerContext, IInvokeHandlerContext>
     {
-        public SagaPersistenceBehavior(ISagaPersister2 persister, ISagaIdGenerator sagaIdGenerator, ICancelDeferredMessages timeoutCancellation, SagaMetadataCollection sagaMetadataCollection, bool persisterSupportsTimeoutStorage)
+        public SagaPersistenceBehavior(ISagaPersister2 persister, ICancelDeferredMessages timeoutCancellation, SagaMetadataCollection sagaMetadataCollection, bool persisterSupportsTimeoutStorage)
         {
-            this.sagaIdGenerator = sagaIdGenerator;
             sagaPersister = persister;
             this.timeoutCancellation = timeoutCancellation;
             this.sagaMetadataCollection = sagaMetadataCollection;
@@ -88,7 +87,7 @@
 
                     var lookupValues = context.Extensions.GetOrCreate<SagaLookupValues>();
 
-                    
+
                     var sagaEntityType = currentSagaMetadata.SagaEntityType;
                     object correlationPropertyValue = null;
                     PropertyInfo propertyInfo = null;
@@ -100,7 +99,7 @@
                         correlationPropertyValue = TypeDescriptor.GetConverter(propertyInfo.PropertyType)
                             .ConvertFromInvariantString(value.PropertyValue.ToString());
                     }
-                   
+
 
                     persistentInstance = await sagaPersister.PrepareNewInstance(currentSagaMetadata.SagaType.FullName, correlationPropertyValue?.ToString(), persisterContext).ConfigureAwait(false);
 
@@ -364,30 +363,6 @@
                 sagaEntity.Originator = replyToAddress;
             }
 
-            //var lookupValues = context.Extensions.GetOrCreate<SagaLookupValues>();
-
-            //SagaCorrelationProperty correlationProperty;
-
-            //if (lookupValues.TryGet(sagaEntityType, out var value))
-            //{
-            //    var propertyInfo = sagaEntityType.GetProperty(value.PropertyName);
-
-            //    var convertedValue = TypeDescriptor.GetConverter(propertyInfo.PropertyType)
-            //        .ConvertFromInvariantString(value.PropertyValue.ToString());
-
-            //    propertyInfo.SetValue(sagaEntity, convertedValue);
-
-            //    correlationProperty = new SagaCorrelationProperty(value.PropertyName, value.PropertyValue);
-            //}
-            //else
-            //{
-            //    correlationProperty = SagaCorrelationProperty.None;
-            //}
-
-            //var sagaIdGeneratorContext = new SagaIdGeneratorContext(correlationProperty, metadata, context.Extensions);
-
-            //sagaEntity.Id = sagaIdGenerator.Generate(sagaIdGeneratorContext);
-
             return sagaEntity;
         }
 
@@ -395,7 +370,6 @@
         readonly bool persisterSupportsTimeoutStorage;
         readonly ISagaPersister2 sagaPersister;
         readonly ICancelDeferredMessages timeoutCancellation;
-        readonly ISagaIdGenerator sagaIdGenerator;
 
         static readonly Task<PersistentSagaInstance> DefaultSagaDataCompletedTask = Task.FromResult(default(PersistentSagaInstance));
         static string TimeoutIdHeaderKey = "NServiceBus.Saga.TimeoutId";

@@ -6,7 +6,7 @@ namespace NServiceBus
 
     class LearningSagaPersister : ISagaPersister2
     {
-        public Task<PersistentSagaInstance> PrepareNewInstance(string sagaType, string correlationPropertyValue, SagaPersisterContext context)
+        public Task<PersistentSagaInstance> PrepareNewInstance(string sagaType, object correlationPropertyValue, SagaPersisterContext context)
         {
             if (correlationPropertyValue == null)
             {
@@ -34,7 +34,7 @@ namespace NServiceBus
             return storageSession.Read(sagaId, sagaType);
         }
 
-        public Task<PersistentSagaInstance> GetByCorrelationProperty(string sagaType, string correlationPropertyValue, SagaPersisterContext context)
+        public Task<PersistentSagaInstance> GetByCorrelationProperty(string sagaType, object correlationPropertyValue, SagaPersisterContext context)
         {
             return Get(sagaType, GenerateSagaId(sagaType, correlationPropertyValue), context);
         }
@@ -45,7 +45,7 @@ namespace NServiceBus
             return storageSession.Complete(persistentSagaInstance);
         }
 
-        string GenerateSagaId(string sagaType, string propertyValue)
+        string GenerateSagaId(string sagaType, object propertyValue)
         {
             return DeterministicGuid.Create($"{sagaType}_{propertyValue}").ToString();
         }
