@@ -5,3 +5,7 @@ branches:
     tag: beta
   release:
     tag: rc
+  custom:
+    increment: none
+    regex: custom/.*$
+    tag: none
