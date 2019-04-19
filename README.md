@@ -6,6 +6,11 @@ You'll find the built assemblies in /binaries.
 
 If you see the build failing, check that you haven't put the source of NServiceBus in a deep subdirectory since long path names (greater than 248 characters) aren't supported by MSBuild.
 
+## Custom Build
+
+msbuild /t:Clean /p:Configuration=Release && nuget.exe restore -DirectDownload -Force && msbuild /t:Build /p:Configuration=Release /p:PackageLicenseUrl=https://raw.githubusercontent.com/Particular/NServiceBus/develop/LICENSE.md
+
+Rename packages in nugets folder.
 
 ## Licensing
 
